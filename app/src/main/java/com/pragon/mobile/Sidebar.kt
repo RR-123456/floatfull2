@@ -80,13 +80,13 @@ class SidebarService : Service() {
         fun sidebarTiles(c: Context): List<String> =
             (prefs(c).getString("tiles", DEFAULT_TILES) ?: "").split(",").map { it.trim() }.filter { it.isNotEmpty() }
         /** v19: the bottom tabs, in the order and visibility you chose with the pencil button (same as the preview's "Edit sections"). */
-        val TABS = listOf(Triple(0, "ctl", "Control"), Triple(1, "grid", "Tiles"), Triple(2, "apps", "Apps"), Triple(3, "files", "Files"), Triple(4, "macro", "Macros"), Triple(5, "tool", "Tools"))
+        val TABS = listOf(Triple(0, "ctl", "Control"), Triple(1, "grid", "Tiles"), Triple(2, "apps", "Apps"), Triple(3, "files", "Files"), Triple(4, "macro", "Macros"), Triple(5, "tool", "Tools"), Triple(6, "gear", "Settings"))
         fun tabOrder(c: Context): List<Int> {
-            val saved = (prefs(c).getString("tab_order", "") ?: "").split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in 0..5 }.distinct()
-            return saved + (0..5).filter { it !in saved }
+            val saved = (prefs(c).getString("tab_order", "") ?: "").split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in 0..6 }.distinct()
+            return saved + (0..6).filter { it !in saved }
         }
         fun tabHidden(c: Context): Set<Int> =
-            (prefs(c).getString("tab_hidden", "") ?: "").split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in 0..5 }.toSet()
+            (prefs(c).getString("tab_hidden", "") ?: "").split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in 0..6 }.toSet()
         fun saveTabs(c: Context, order: List<Int>, hidden: Set<Int>) =
             prefs(c).edit().putString("tab_order", order.joinToString(",")).putString("tab_hidden", hidden.joinToString(",")).apply()
         fun leftSide(c: Context) = prefs(c).getBoolean("left", false)
@@ -492,6 +492,7 @@ class SidebarService : Service() {
 
             }
             4 -> macrosTab(body, am)
+            6 -> settingsTab(body)
             5 -> toolsTab(body)
             else -> controlTab(body, am)
         }
@@ -679,6 +680,19 @@ class SidebarService : Service() {
         body.addView(row(button("🧰 All tools") { openTool(toolIntent(ToolsActivity::class.java)) }, View(this)))
     }
 
+    /** v19.1: the preview's Settings tab: Pragon settings, UI customiser and the phone permissions Pragon needs. */
+    private fun settingsTab(body: LinearLayout) {
+        fun open(i: Intent) { try { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); collapse() } catch (e: Exception) { say("Could not open that.") } }
+        body.addView(label("PRAGON"))
+        body.addView(row(button("⚙ Pragon settings", true) { open(Intent(this, SettingsActivity::class.java)) }))
+        body.addView(row(button("Orb & UI customiser") { open(Intent(this, CustomiserActivity::class.java)) }))
+        body.addView(label("PERMISSIONS"))
+        body.addView(row(button("Accessibility") { open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }, button("Display over apps") { open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName"))) }))
+        body.addView(row(button("Notification access") { open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }, button("App info") { open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }))
+        body.addView(label("SIDEBAR"))
+        body.addView(row(button("⇄ Switch side") { switchSide() }, button("Edit sections") { editing = true; fillPanel() }))
+    }
+
     private fun tabBar(): View {
         val wrap = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         wrap.addView(View(this).apply { background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0x0000D4FF, 0x5900D4FF, 0x0000D4FF)) },
@@ -699,7 +713,7 @@ class SidebarService : Service() {
                 setOnClickListener { resetIdle(); if (ptab != i || editing) { typingMode(false); ptab = i; editing = false; fillPanel(); riseIn() } }
             }
             t.addView(SbIcon(this, ic, if (on) SbIcon.CYAN else SbIcon.GRAY), LinearLayout.LayoutParams(dp(19), dp(19)))
-            t.addView(TextView(this).apply { text = name; textSize = 10.5f; maxLines = 1; gravity = Gravity.CENTER; typeface = fSemi; setTextColor(if (on) txt else mute); setPadding(0, dp(3), 0, 0) })
+            t.addView(TextView(this).apply { text = name; textSize = if (shown.size > 6) 9.5f else 10.5f; maxLines = 1; gravity = Gravity.CENTER; typeface = fSemi; setTextColor(if (on) txt else mute); setPadding(0, dp(3), 0, 0) })
             bar.addView(t, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(dp(1), 0, dp(1), 0) })
         }
         wrap.addView(bar)
@@ -735,7 +749,7 @@ class SidebarService : Service() {
                 LinearLayout.LayoutParams(dp(34), ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(2), 0, dp(2), 0) })
             body.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(3), dp(3), dp(3), dp(3)) })
         }
-        body.addView(button("Reset to default") { saveTabs(this, (0..5).toList(), emptySet()); say("Sections reset."); fillPanelKeepScroll() },
+        body.addView(button("Reset to default") { saveTabs(this, (0..6).toList(), emptySet()); say("Sections reset."); fillPanelKeepScroll() },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(3), dp(12), dp(3), dp(3)) })
     }
 
